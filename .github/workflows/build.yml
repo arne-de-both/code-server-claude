@@ -1,0 +1,49 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - Dockerfile
+      - .github/workflows/build.yml
+  workflow_dispatch:
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    # ARC self-hosted runner scale set (dind) registered to this repo — see
+    # talos-cluster/applications/github-arc/code-server-builders*.yaml
+    runs-on: code-server-builders
+    permissions:
+      contents: read
+      packages: write
+    env:
+      IMAGE: ghcr.io/arne-de-both/code-server-claude
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Build and push
+        run: |
+          set -euo pipefail
+          SHA_TAG="sha-${GITHUB_SHA::12}"
+          docker build -t "$IMAGE:$SHA_TAG" -t "$IMAGE:latest" .
+          docker push "$IMAGE:$SHA_TAG"
+          docker push "$IMAGE:latest"
+          DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' "$IMAGE:latest")
+          echo "Pushed: $IMAGE:$SHA_TAG"
+          echo "Digest: $DIGEST"
+          {
+            echo "### code-server-claude image published"
+            echo ""
+            echo "| field | value |"
+            echo "|---|---|"
+            echo "| tag | \`$IMAGE:$SHA_TAG\` |"
+            echo "| digest | \`$DIGEST\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
