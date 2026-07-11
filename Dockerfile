@@ -5,7 +5,9 @@
 #
 # NOTE: at runtime a PVC mounts over /home/coder, masking anything baked into it.
 # Therefore all baked config goes to system paths (/etc, /usr) — never /home/coder.
-FROM docker.io/codercom/code-server:4.127.0
+# Pinned by digest (not just tag) for reproducible, tamper-evident builds.
+# tag: 4.127.0 — bump digest deliberately when upgrading.
+FROM docker.io/codercom/code-server:4.127.0@sha256:b2824b514d5695916415690605278aed0075ec6f4814f6016aa347baf25f88c6
 
 USER root
 
@@ -26,10 +28,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # --- system Node LTS (22.x) — hosts the global `claude` CLI, decoupled from mise ---
 RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && apt-get install -y --no-install-recommends nodejs \
-    && npm install -g @anthropic-ai/claude-code \
+    && npm install -g @anthropic-ai/claude-code@2.1.207 \
     && npm cache clean --force \
     && rm -rf /var/lib/apt/lists/*
 
+# Installer residual (accepted): nodesource + mise.run are fetched over TLS from
+# their official sources; MISE_VERSION is pinned and the base image is digest-pinned
+# above (closing the root-exec-of-base vector). Full checksum verification deferred.
 # --- mise (binary system-wide; runtimes install to $HOME on the PVC at runtime) ---
 RUN curl -fsSL https://mise.run | MISE_VERSION=v2026.7.5 MISE_INSTALL_PATH=/usr/local/bin/mise sh \
     && chmod 755 /usr/local/bin/mise
