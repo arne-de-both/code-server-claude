@@ -26,8 +26,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # --- system Node LTS (22.x) — hosts the global `claude` CLI, decoupled from mise ---
+# nodejs pinned to an exact nodesource build; bump deliberately on each Node
+# security release. 22.23.4 fixes the Oct 2026 Node.js CVEs. The build fails
+# if nodesource drops this version, rather than silently installing another.
+ARG NODEJS_VERSION=22.23.4-1nodesource1
 RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
-    && apt-get install -y --no-install-recommends nodejs \
+    && apt-get install -y --no-install-recommends "nodejs=${NODEJS_VERSION}" \
+    && node -v | grep -qx "v${NODEJS_VERSION%%-*}" \
     && npm install -g @anthropic-ai/claude-code@2.1.207 \
     && npm cache clean --force \
     && rm -rf /var/lib/apt/lists/*
